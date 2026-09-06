@@ -1,0 +1,12 @@
+.env
+.tools/
+.pnpm-store/
+*.tsbuildinfo
+*.log
+.idea/
+.vscode/
+backend/target/
+frontend/node_modules/
+frontend/dist/
+storage/*
+!storage/.gitkeep

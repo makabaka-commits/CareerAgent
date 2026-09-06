@@ -1,0 +1,23 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: career_agent
+      MYSQL_USER: career_agent
+      MYSQL_PASSWORD: career_agent
+      MYSQL_ROOT_PASSWORD: local-root-only
+    ports: ["3306:3306"]
+    volumes: ["mysql_data:/var/lib/mysql"]
+    healthcheck: {test: ["CMD","mysqladmin","ping","-h","localhost"], interval: 10s, timeout: 5s, retries: 10}
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck: {test: ["CMD","redis-cli","ping"], interval: 10s, timeout: 5s, retries: 10}
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_DB: career_agent, POSTGRES_USER: career_agent, POSTGRES_PASSWORD: career_agent}
+    ports: ["5432:5432"]
+    volumes: ["pg_data:/var/lib/postgresql/data","./postgres/init:/docker-entrypoint-initdb.d:ro"]
+    healthcheck: {test: ["CMD-SHELL","pg_isready -U career_agent"], interval: 10s, timeout: 5s, retries: 10}
+volumes: {mysql_data: {}, pg_data: {}}
+

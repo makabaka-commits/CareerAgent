@@ -1,0 +1,32 @@
+package dev.careeragent.interview;
+
+import dev.careeragent.common.ApiException;
+import dev.careeragent.domain.Models.*;
+import dev.careeragent.infrastructure.InMemoryStore;
+import dev.careeragent.job.JobService;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+public class InterviewService {
+    private final InMemoryStore store;private final JobService jobs;
+    public InterviewService(InMemoryStore store,JobService jobs){this.store=store;this.jobs=jobs;}
+    public Interview create(long userId,long jobId){jobs.owned(userId,jobId);long id=store.nextId();Interview value=new Interview(id,userId,jobId,"CREATED",new ArrayList<>(),null,null,null,null);store.interviews.put(id,value);return value;}
+    public InterviewQuestion start(long userId,long id){Interview interview=owned(userId,id);if(!"CREATED".equals(interview.status()))throw new ApiException(HttpStatus.CONFLICT,"面试已经开始");Job job=jobs.owned(userId,interview.jobId());List<JobRequirement> selected=job.requirements().stream().sorted(Comparator.comparing((JobRequirement r)->"REQUIRED".equals(r.importance())?0:1)).limit(3).toList();List<Long> ids=new ArrayList<>();int seq=1;for(JobRequirement r:selected){InterviewQuestion q=createQuestion(id,seq++,r.skillName(),null);ids.add(q.id());}if(ids.isEmpty()){InterviewQuestion q=createQuestion(id,1,"Java",null);ids.add(q.id());}store.interviews.put(id,new Interview(id,userId,interview.jobId(),"IN_PROGRESS",ids,null,null,Instant.now(),null));return store.questions.get(ids.get(0));}
+    public AnswerResult answer(long userId,long id,long questionId,String answer){Interview interview=owned(userId,id);if(!"IN_PROGRESS".equals(interview.status()))throw new ApiException(HttpStatus.CONFLICT,"面试不在进行中");InterviewQuestion q=store.questions.get(questionId);if(q==null||q.interviewId()!=id||q.score()!=null)throw new ApiException(HttpStatus.BAD_REQUEST,"题目不可回答");QuestionEvaluation evaluation=evaluate(q,answer);InterviewQuestion completed=new InterviewQuestion(q.id(),q.interviewId(),q.sequenceNo(),q.question(),q.skillName(),q.difficulty(),q.referencePoints(),answer,evaluation.score(),evaluation,q.parentQuestionId());store.questions.put(q.id(),completed);
+        InterviewQuestion next=null;if(evaluation.followUpNeeded()&&q.parentQuestionId()==null&&interview.questionIds().stream().map(store.questions::get).noneMatch(x->Objects.equals(x.parentQuestionId(),q.id()))){next=createFollowUp(interview,q,evaluation.missingPoints());}
+        if(next==null)next=interview.questionIds().stream().map(store.questions::get).filter(x->x.score()==null).findFirst().orElse(null);return new AnswerResult(completed,next,next==null);
+    }
+    public Interview finish(long userId,long id){Interview interview=owned(userId,id);List<InterviewQuestion> answered=interview.questionIds().stream().map(store.questions::get).filter(q->q.score()!=null).toList();if(answered.isEmpty())throw new ApiException(HttpStatus.CONFLICT,"至少回答一道题后才能结束");double total=round(answered.stream().mapToDouble(InterviewQuestion::score).average().orElse(0));Map<String,Double> bySkill=answered.stream().collect(Collectors.groupingBy(InterviewQuestion::skillName,LinkedHashMap::new,Collectors.collectingAndThen(Collectors.averagingDouble(InterviewQuestion::score),this::round)));List<String> strengths=bySkill.entrySet().stream().filter(e->e.getValue()>=75).map(Map.Entry::getKey).toList();List<String> weaknesses=bySkill.entrySet().stream().filter(e->e.getValue()<60).map(Map.Entry::getKey).toList();InterviewReport report=new InterviewReport(total,strengths.isEmpty()?bySkill:bySkill,strengths,weaknesses,List.of("回答采用结论—原理—项目案例—验证结果的结构","为薄弱技能补充可运行项目与量化结果","复盘每道题遗漏的参考知识点"));Interview done=new Interview(id,userId,interview.jobId(),"COMPLETED",interview.questionIds(),total,report,interview.startedAt(),Instant.now());store.interviews.put(id,done);return done;}
+    public Interview owned(long userId,long id){Interview i=store.interviews.get(id);if(i==null||i.userId()!=userId)throw new ApiException(HttpStatus.NOT_FOUND,"面试不存在");return i;}
+    public record AnswerResult(InterviewQuestion evaluation,InterviewQuestion nextQuestion,boolean canFinish){}
+    private InterviewQuestion createQuestion(long interviewId,int seq,String skill,Long parent){List<String> points=points(skill);String text=parent==null?"请结合原理和项目实践，说明你如何使用 "+skill+" 解决一个真实问题？":"刚才的回答还缺少关键依据。请具体说明："+String.join("、",points);long id=store.nextId();InterviewQuestion q=new InterviewQuestion(id,interviewId,seq,text,skill,seq==1?"EASY":"MEDIUM",points,null,null,null,parent);store.questions.put(id,q);return q;}
+    private InterviewQuestion createFollowUp(Interview interview,InterviewQuestion parent,List<String> missing){InterviewQuestion q=createQuestion(interview.id(),interview.questionIds().size()+1,parent.skillName(),parent.id());List<Long> ids=new ArrayList<>(interview.questionIds());ids.add(q.id());store.interviews.put(interview.id(),new Interview(interview.id(),interview.userId(),interview.jobId(),interview.status(),ids,null,null,interview.startedAt(),null));return q;}
+    private QuestionEvaluation evaluate(InterviewQuestion q,String answer){String lower=answer.toLowerCase(Locale.ROOT);List<String> covered=q.referencePoints().stream().filter(p->lower.contains(p.toLowerCase(Locale.ROOT))).toList();List<String> missing=q.referencePoints().stream().filter(p->!covered.contains(p)).toList();double length=Math.min(30,answer.trim().length()/6.0);double coverage=70.0*covered.size()/q.referencePoints().size();double score=round(Math.min(100,length+coverage));String feedback=score>=75?"知识点覆盖较完整，请继续用量化结果增强说服力。":"回答方向基本可用，但需要补充原理、边界条件和可验证的项目证据。";return new QuestionEvaluation(score,covered,missing,feedback,score<60&&!missing.isEmpty());}
+    private List<String> points(String skill){return switch(skill){case "Java"->List.of("并发","异常","测试");case "Redis"->List.of("TTL","一致性","穿透");case "MySQL"->List.of("索引","事务","EXPLAIN");case "Spring Boot"->List.of("依赖注入","事务","监控");default->List.of("原理","场景","验证");};}
+    private double round(double v){return Math.round(v*10)/10.0;}
+}
+

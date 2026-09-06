@@ -1,0 +1,20 @@
+@host = http://localhost:8080/api/v1
+@token = paste-token-here
+
+### 注册
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{"username":"demo_student","email":"demo@career.dev","password":"career123"}
+
+### 当前画像
+GET {{host}}/profiles/me
+Authorization: Bearer {{token}}
+
+### 创建岗位
+POST {{host}}/jobs
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"companyName":"未来科技","positionName":"Java 后端实习生","rawContent":"岗位要求：熟练掌握 Java 和 Spring Boot，掌握 MySQL；了解 Redis、Linux、Docker，有良好的计算机网络基础。"}
+

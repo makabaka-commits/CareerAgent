@@ -1,0 +1,31 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: career-agent
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 8MB
+  ai:
+    openai:
+      api-key: ${AI_API_KEY:disabled}
+      base-url: ${AI_BASE_URL:https://api.openai.com}
+      chat:
+        options:
+          model: ${AI_CHAT_MODEL:gpt-4.1-mini}
+    model:
+      chat: ${AI_PROVIDER:none}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+app:
+  token-secret: ${APP_TOKEN_SECRET:career-agent-local-demo-secret-change-me}
+  storage-root: ${FILE_STORAGE_ROOT:../storage}
+  cors-origin: ${CORS_ORIGIN:http://localhost:5173}
+  agent:
+    max-tool-calls: 8
+    timeout-seconds: 60
+    recent-message-count: 12

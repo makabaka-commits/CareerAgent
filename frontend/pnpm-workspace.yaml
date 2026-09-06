@@ -1,0 +1,6 @@
+packages:
+  - .
+confirmModulesPurge: false
+verifyDepsBeforeRun: false
+allowBuilds:
+  esbuild: true
