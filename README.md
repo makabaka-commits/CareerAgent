@@ -27,7 +27,7 @@ pnpm --dir frontend install
 pnpm --dir frontend dev
 ```
 
-访问 [http://localhost:5173](http://localhost:5173)，点击“在线体验”即可生成一套非满分示例数据。API 文档位于 [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)。
+项目在本机成功启动后，访问 `http://localhost:5173`，点击“在线体验”即可生成一套非满分示例数据。API 文档位于 `http://localhost:8080/swagger-ui.html`。`localhost` 只代表当前电脑，并不是公网演示地址。
 
 ## 用 `http://localhost` 访问完整生产拓扑
 
@@ -38,7 +38,7 @@ Copy-Item deploy/.env.example deploy/.env
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
 ```
 
-打开 [http://localhost](http://localhost)。如需公网网址，把同一套容器部署到云服务器或 Railway/Render，再绑定域名并启用 HTTPS；详见 [部署说明](docs/deployment.md)。
+项目在本机成功启动后，打开 `http://localhost`。如需任何人都能访问的公网网址，需要把同一套容器部署到云服务器或 Railway/Render，再绑定域名并启用 HTTPS；详见 [部署说明](docs/deployment.md)。
 
 ## 匹配结果为什么不会轻易 100 分
 
