@@ -19,9 +19,14 @@ public class JobService {
         if (content == null || content.trim().length() < 30) throw new ApiException(HttpStatus.BAD_REQUEST, "JD 内容至少需要 30 个字符");
         List<JobRequirement> requirements = new ArrayList<>();
         for (Skill skill : skills.detect(content)) {
-            String evidence = content.lines().map(String::trim).filter(line -> containsSkill(line, skill)).findFirst().orElse("JD 提及 " + skill.name());
-            String importance = containsAny(evidence.toLowerCase(Locale.ROOT), "必须", "熟练", "精通", "required", "要求") ? "REQUIRED" : "PREFERRED";
-            int level = containsAny(evidence, "精通", "深入") ? 4 : containsAny(evidence, "熟练", "掌握") ? 3 : 2;
+            String evidence = Arrays.stream(content.split("[\\n。；;]"))
+                    .map(String::trim).filter(line -> containsSkill(line, skill)).findFirst()
+                    .orElse("JD 提及 " + skill.name());
+            String normalized = evidence.toLowerCase(Locale.ROOT);
+            boolean preferred = containsAny(normalized, "优先", "加分", "了解", "熟悉", "preferred", "nice to have");
+            String importance = preferred ? "PREFERRED" : "REQUIRED";
+            int level = containsAny(evidence, "精通", "深入", "expert") ? 4
+                    : containsAny(evidence, "熟练", "掌握", "proficient") ? 3 : 2;
             requirements.add(new JobRequirement(skill.id(), skill.name(), importance, level, evidence));
         }
         if (requirements.isEmpty()) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "JD 中未识别到技能，请补充技术要求");
@@ -33,4 +38,3 @@ public class JobService {
     private boolean containsAny(String value,String...terms){return Arrays.stream(terms).anyMatch(value::contains);}
     private String clean(String v){return v==null?"":v.trim();}
 }
-

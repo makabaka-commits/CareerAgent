@@ -2,6 +2,10 @@ package dev.careeragent.infrastructure;
 
 import dev.careeragent.domain.Models.*;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -11,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class InMemoryStore {
     private final AtomicLong ids = new AtomicLong(100);
+    private StatePersistence persistence;
     public final Map<Long, User> users = new ConcurrentHashMap<>();
     public final Map<Long, Profile> profiles = new ConcurrentHashMap<>();
     public final Map<Long, Skill> skills = new ConcurrentHashMap<>();
@@ -23,10 +28,19 @@ public class InMemoryStore {
     public final Map<Long, Interview> interviews = new ConcurrentHashMap<>();
     public final Map<Long, InterviewQuestion> questions = new ConcurrentHashMap<>();
 
+    public InMemoryStore() {}
+    @Autowired public InMemoryStore(ObjectProvider<StatePersistence> persistence) { this.persistence = persistence.getIfAvailable(); }
+
     public long nextId() { return ids.incrementAndGet(); }
 
     @PostConstruct
+    public void initialize() {
+        if (persistence != null && persistence.load().map(this::restore).orElse(false)) return;
+        seedSkills();
+    }
+
     public void seedSkills() {
+        if (!skills.isEmpty()) return;
         addSkill("JAVA", "Java", "LANGUAGE", "java17", "jdk");
         addSkill("SPRING_BOOT", "Spring Boot", "FRAMEWORK", "springboot", "spring boot", "spring");
         addSkill("MYSQL", "MySQL", "DATABASE", "mysql", "sql");
@@ -44,5 +58,24 @@ public class InMemoryStore {
     private void addSkill(String code, String name, String category, String... aliases) {
         long id = nextId();
         skills.put(id, new Skill(id, code, name, category, List.of(aliases)));
+    }
+
+    @Scheduled(fixedDelayString = "${app.persistence.flush-ms:1500}")
+    public void flush() { if (persistence != null) persistence.save(snapshot()); }
+    @PreDestroy public void shutdown() { flush(); }
+
+    private StoreSnapshot snapshot() {
+        return new StoreSnapshot(ids.get(), Map.copyOf(users), Map.copyOf(profiles), Map.copyOf(skills),
+                Map.copyOf(userSkills), Map.copyOf(resumes), Map.copyOf(jobs), Map.copyOf(conversations),
+                Map.copyOf(messages), Map.copyOf(knowledge), Map.copyOf(interviews), Map.copyOf(questions));
+    }
+
+    private boolean restore(StoreSnapshot state) {
+        ids.set(Math.max(100, state.lastId()));
+        users.putAll(state.users()); profiles.putAll(state.profiles()); skills.putAll(state.skills());
+        userSkills.putAll(state.userSkills()); resumes.putAll(state.resumes()); jobs.putAll(state.jobs());
+        conversations.putAll(state.conversations()); messages.putAll(state.messages()); knowledge.putAll(state.knowledge());
+        interviews.putAll(state.interviews()); questions.putAll(state.questions());
+        return true;
     }
 }

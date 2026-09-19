@@ -20,9 +20,9 @@ public class ResumeController {
     @GetMapping("/{id}") public ApiResponse<Resume> get(HttpServletRequest r, @PathVariable long id) { return ApiResponse.ok(service.owned(uid(r), id)); }
     @GetMapping public ApiResponse<List<Resume>> list(HttpServletRequest r) { long u=uid(r); return ApiResponse.ok(store.resumes.values().stream().filter(x->x.userId()==u).sorted(Comparator.comparing(Resume::createdAt).reversed()).toList()); }
     @PutMapping("/{id}/parsed-content") public ApiResponse<Resume> edit(HttpServletRequest r, @PathVariable long id, @RequestBody StructuredResume body) {
-        Resume old=service.owned(uid(r),id); Resume value=new Resume(old.id(),old.userId(),old.fileName(),old.contentType(),old.rawText(),body,"PARSED",old.current(),null,old.createdAt()); store.resumes.put(id,value); return ApiResponse.ok(value);
+        Resume old=service.owned(uid(r),id); Resume value=new Resume(old.id(),old.userId(),old.fileName(),old.contentType(),old.fileKey(),old.rawText(),body,"PARSED",old.current(),null,old.createdAt()); store.resumes.put(id,value); return ApiResponse.ok(value);
     }
     @PostMapping("/{id}/confirm") public ApiResponse<Resume> confirm(HttpServletRequest r, @PathVariable long id) { return ApiResponse.ok(service.confirm(uid(r),id,null)); }
-    @DeleteMapping("/{id}") public ApiResponse<Void> delete(HttpServletRequest r,@PathVariable long id) { service.owned(uid(r),id); store.resumes.remove(id); store.userSkills.entrySet().removeIf(e->Objects.equals(e.getValue().sourceRefId(),id)); return ApiResponse.ok(); }
+    @DeleteMapping("/{id}") public ApiResponse<Void> delete(HttpServletRequest r,@PathVariable long id) { service.delete(uid(r),id); return ApiResponse.ok(); }
     private long uid(HttpServletRequest r){ return (long)r.getAttribute(AuthFilter.USER_ID); }
 }

@@ -3,6 +3,17 @@ server:
 spring:
   application:
     name: career-agent
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:file:./storage/career-agent;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE}
+    username: ${DATABASE_USER:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
   servlet:
     multipart:
       max-file-size: 8MB
@@ -20,10 +31,19 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
 app:
   token-secret: ${APP_TOKEN_SECRET:career-agent-local-demo-secret-change-me}
   storage-root: ${FILE_STORAGE_ROOT:../storage}
+  persistence:
+    mode: ${PERSISTENCE_MODE:jdbc}
+    flush-ms: ${PERSISTENCE_FLUSH_MS:1500}
+  rate-limit:
+    mode: ${RATE_LIMIT_MODE:local}
+    requests-per-minute: ${RATE_LIMIT_RPM:120}
   cors-origin: ${CORS_ORIGIN:http://localhost:5173}
   agent:
     max-tool-calls: 8

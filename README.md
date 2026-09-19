@@ -1,47 +1,48 @@
-# CareerAgent — AI 求职智能体平台
+# CareerAgent
 
-CareerAgent 面向计算机专业学生与初级开发者，把“简历 → JD → 可解释匹配 → Agent 咨询 → 模拟面试”串成一个可演示闭环。匹配分由 Java 规则计算，模型只负责解释；技能结论始终保留来源和证据。
+面向计算机专业学生的可解释 AI 求职智能体。它把简历解析、岗位分析、证据化匹配、Agent 咨询和模拟面试串成一个完整产品闭环；评分由确定性规则完成，模型只负责工具选择与解释。
 
-## 已实现
+## 为什么值得放进作品集
 
-- HMAC Bearer Token 注册登录、BCrypt 密码散列和用户资源隔离；
-- PDF/DOCX/TXT/Markdown 简历文本提取、结构化技能识别、人工确认后写入长期画像；
-- JD 技能归一化与确定性匹配：`REQUIRED=3`、`PREFERRED=1`，逐项展示原文和证据；
-- Spring AI 2.0 的五个 `@Tool`：画像、简历、岗位、技能差距、知识检索；
-- SSE 事件流：`status/tool_call/content/citation/done/error`；
-- 本地知识库检索与可回溯 chunk 引用；
-- 多题模拟面试、一次追问、覆盖点评分和分技能报告；
-- Vue 3 + TypeScript 的完整演示工作台和 OpenAPI 文档。
+- **正式产品界面**：Vue 3 + TypeScript 的落地页、体验入口与响应式工作台，不是单页表单 Demo。
+- **可信匹配**：技能覆盖 40%、证据强度 30%、熟练度适配 20%、项目相关性 10%，逐项说明得分和原始 JD。
+- **Agent 工程**：Spring AI 工具调用、SSE 状态流、短期会话上下文、可追溯 RAG 引用、超时自动降级。
+- **生产能力**：H2 零配置本地运行，PostgreSQL 持久化、Redis 分布式限流、文件存储抽象、Actuator/Prometheus 指标。
+- **可部署**：Docker Compose 一键启动前端、后端、PostgreSQL 与 Redis；GitHub Actions 自动测试、构建与镜像校验。
 
-默认 `local-demo` 运行态使用进程内存储，不需要先安装数据库或配置模型，因此可从空环境直接演示。`deploy/` 和 `db/migration/` 提供 MySQL、Redis、pgvector 的生产拓扑与 11 张业务表；接入真实基础设施时应替换 `InMemoryStore` 适配器。未配置 `AI_API_KEY` 时 Agent 会显式使用确定性降级，不伪造模型输出。
+## 技术栈
 
-## 本地启动
+`Java 17` · `Spring Boot 4` · `Spring AI 2` · `Vue 3` · `TypeScript` · `PostgreSQL/pgvector` · `Redis` · `H2` · `Docker` · `SSE`
 
-要求 Java 17+ 与 Node.js 20+。仓库内下载的 Maven 位于 `.tools/`，该目录不会提交。
+## 5 分钟本地运行
+
+需要 Java 17+、Node.js 20+。默认不需要数据库和模型密钥。
 
 ```powershell
-# 后端
+# 终端 1：后端
 & .\.tools\apache-maven-3.9.16\bin\mvn.cmd -pl backend spring-boot:run
 
-# 新开终端，前端
-& 'C:\Users\19171\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd' --dir frontend install
-& 'C:\Users\19171\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback\pnpm.cmd' --dir frontend dev
+# 终端 2：前端
+pnpm --dir frontend install
+pnpm --dir frontend dev
 ```
 
-访问 `http://localhost:5173`；API 文档为 `http://localhost:8080/swagger-ui.html`，健康检查为 `/actuator/health`。
+访问 [http://localhost:5173](http://localhost:5173)，点击“在线体验”即可生成一套非满分示例数据。API 文档位于 [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)。
 
-演示顺序：注册 → 完善画像 → 上传并确认 `tests/fixtures/resume-demo.md` → 创建示例 JD → 查看匹配 → Agent 提问 → 完成模拟面试。
+## 用 `http://localhost` 访问完整生产拓扑
 
-## 启用模型
+安装 Docker Desktop 后：
 
 ```powershell
-$env:AI_PROVIDER='openai'
-$env:AI_BASE_URL='https://your-openai-compatible-host'
-$env:AI_API_KEY='your-key'
-$env:AI_CHAT_MODEL='your-model'
+Copy-Item deploy/.env.example deploy/.env
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
 ```
 
-密钥仅通过环境变量提供。外部简历/JD/知识文档均被视为数据，不能覆盖 Agent 系统约束。
+打开 [http://localhost](http://localhost)。如需公网网址，把同一套容器部署到云服务器或 Railway/Render，再绑定域名并启用 HTTPS；详见 [部署说明](docs/deployment.md)。
+
+## 匹配结果为什么不会轻易 100 分
+
+岗位要求按 `REQUIRED=3`、`PREFERRED=1` 加权。即使简历提到某项技能，也还要检查项目证据、目标熟练度和场景相关性；未确认的技能再乘 0.7。只有每项技能都有充分且可验证的证据时，结果才可能接近 100。算法说明见 [评分设计](docs/scoring.md)。
 
 ## 验证
 
@@ -50,5 +51,12 @@ $env:AI_CHAT_MODEL='your-model'
 pnpm --dir frontend build
 ```
 
-更详细的架构、API 和演示说明见 [`docs/`](docs/architecture.md)。
+## 文档
 
+- [系统架构](docs/architecture.md)
+- [评分设计](docs/scoring.md)
+- [API 摘要](docs/api.md)
+- [部署说明](docs/deployment.md)
+- [演示与面试讲解](docs/demo.md)
+
+> 隐私提示：上传的简历默认保存在本机 `storage/`。请勿提交真实简历、密钥或生产环境变量。

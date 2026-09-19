@@ -20,7 +20,8 @@ import java.util.*;
 public class ResumeService {
     private final InMemoryStore store;
     private final SkillService skills;
-    public ResumeService(InMemoryStore store, SkillService skills) { this.store = store; this.skills = skills; }
+    private final ResumeFileStorage files;
+    public ResumeService(InMemoryStore store, SkillService skills, ResumeFileStorage files) { this.store = store; this.skills = skills; this.files = files; }
 
     public Resume upload(long userId, MultipartFile file) {
         String name = Optional.ofNullable(file.getOriginalFilename()).orElse("resume");
@@ -29,8 +30,9 @@ public class ResumeService {
         try {
             String text = extract(file, ext).replace('\u0000', ' ').trim();
             if (text.length() < 20) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "未提取到足够文本；扫描版 PDF 暂不支持 OCR");
+            String fileKey = files.save(userId, file);
             long id = store.nextId();
-            Resume resume = new Resume(id, userId, name, file.getContentType(), text, null, "UPLOADED", false, null, Instant.now());
+            Resume resume = new Resume(id, userId, name, file.getContentType(), fileKey, text, null, "UPLOADED", false, null, Instant.now());
             store.resumes.put(id, resume); return resume;
         } catch (ApiException e) { throw e; }
         catch (Exception e) { throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "简历文本提取失败"); }
@@ -44,7 +46,7 @@ public class ResumeService {
         StructuredResume parsed = new StructuredResume(name, findSection(old.rawText(), "教育", "大学", "学院"), found,
                 lines.stream().filter(l -> containsAny(l, "项目", "系统", "平台", "开发")).limit(5).toList(),
                 lines.stream().filter(l -> containsAny(l, "实习", "工作", "负责", "参与")).limit(5).toList());
-        Resume value = new Resume(old.id(), old.userId(), old.fileName(), old.contentType(), old.rawText(), parsed, "PARSED", old.current(), null, old.createdAt());
+        Resume value = new Resume(old.id(), old.userId(), old.fileName(), old.contentType(), old.fileKey(), old.rawText(), parsed, "PARSED", old.current(), null, old.createdAt());
         store.resumes.put(id, value); return value;
     }
 
@@ -52,12 +54,12 @@ public class ResumeService {
         Resume old = owned(userId, id);
         StructuredResume parsed = corrected != null ? corrected : old.parsed();
         if (parsed == null) throw new ApiException(HttpStatus.CONFLICT, "请先解析简历");
-        store.resumes.replaceAll((key, value) -> value.userId() == userId ? new Resume(value.id(), value.userId(), value.fileName(), value.contentType(), value.rawText(), value.parsed(), value.status(), false, value.errorMessage(), value.createdAt()) : value);
+        store.resumes.replaceAll((key, value) -> value.userId() == userId ? new Resume(value.id(), value.userId(), value.fileName(), value.contentType(), value.fileKey(), value.rawText(), value.parsed(), value.status(), false, value.errorMessage(), value.createdAt()) : value);
         for (ResumeSkill item : parsed.skills()) skills.normalize(item.name()).ifPresent(skill -> {
             long skillId = store.nextId();
             store.userSkills.put(skillId, new UserSkill(skillId, userId, skill.id(), Math.max(1, Math.min(5, item.level())), "RESUME", item.evidence(), id, true));
         });
-        Resume value = new Resume(old.id(), old.userId(), old.fileName(), old.contentType(), old.rawText(), parsed, "CONFIRMED", true, null, old.createdAt());
+        Resume value = new Resume(old.id(), old.userId(), old.fileName(), old.contentType(), old.fileKey(), old.rawText(), parsed, "CONFIRMED", true, null, old.createdAt());
         store.resumes.put(id, value); return value;
     }
 
@@ -65,6 +67,12 @@ public class ResumeService {
         Resume resume = store.resumes.get(id);
         if (resume == null || resume.userId() != userId) throw new ApiException(HttpStatus.NOT_FOUND, "简历不存在");
         return resume;
+    }
+    public void delete(long userId, long id) {
+        Resume value = owned(userId, id);
+        files.delete(value.fileKey());
+        store.resumes.remove(id);
+        store.userSkills.entrySet().removeIf(e -> Objects.equals(e.getValue().sourceRefId(), id));
     }
     private String extract(MultipartFile file, String ext) throws Exception {
         byte[] bytes = file.getBytes();
@@ -79,4 +87,3 @@ public class ResumeService {
     private String findSection(String text, String... terms) { return text.lines().map(String::trim).filter(l -> containsAny(l, terms)).findFirst().orElse(""); }
     private boolean containsAny(String value, String... terms) { return Arrays.stream(terms).anyMatch(value::contains); }
 }
-

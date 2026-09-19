@@ -1,26 +1,47 @@
-# 架构说明
+# 系统架构
 
-CareerAgent 是 Spring Boot + Vue 3 的模块化单体。Controller 只处理 HTTP 与 DTO；领域服务负责简历、岗位、匹配、检索和面试规则；`CareerAgentTools` 是五个薄工具适配器。
+CareerAgent 采用模块化单体：保持毕业项目可读性，同时用端口与适配器隔离文件、状态、缓存和模型，便于后续拆分。
 
-```text
-Vue 工作台 ── REST / SSE ── Spring Boot
-                              ├─ Auth / Profile / Resume
-                              ├─ Job / SkillGap (纯 Java 计算)
-                              ├─ CareerAgent + 5 Tools
-                              ├─ Knowledge Retrieval
-                              └─ Interview State Machine
-                                         │
-                 local-demo: InMemoryStore（零配置演示）
-                 production: MySQL + Redis + pgvector（deploy/）
+```mermaid
+flowchart LR
+  U[Vue 3 工作台] -->|REST + SSE| B[Spring Boot API]
+  B --> A[Career Agent]
+  A --> T[5 个领域工具]
+  T --> P[画像 / 简历 / 岗位]
+  T --> S[确定性匹配引擎]
+  T --> R[知识检索]
+  B --> I[模拟面试状态机]
+  B --> DB[(H2 / PostgreSQL)]
+  B --> FS[(简历文件卷)]
+  B --> C[(Redis 限流)]
 ```
-
-关键边界：模型不计算匹配分；长期技能只在用户确认后写入；所有资源通过 `userId + resourceId` 校验；检索为空时明确不提供引用；GitHub MCP 是 M6 扩展，不是当前完成项。
 
 ## Agent 请求链路
 
-1. 鉴权过滤器解析 Bearer Token，并把 userId 放入请求作用域。
-2. 会话绑定可选 jobId；完整消息进入事实存储。
-3. Spring AI 可用时，ChatClient 通过五个 `@Tool` 按需读取最小上下文。
-4. 模型未配置时走确定性降级，同样调用匹配和检索领域服务。
-5. 前端消费 SSE 公开状态、工具名、内容和引用；不展示私有推理。
+```mermaid
+sequenceDiagram
+  participant UI as Web
+  participant API as Agent API
+  participant LLM as Chat Model
+  participant Tool as Domain Tools
+  UI->>API: message + conversationId
+  API-->>UI: status
+  API->>LLM: system policy + recent context
+  LLM->>Tool: profile/job/gap/knowledge
+  Tool-->>LLM: owned and cited facts
+  LLM-->>API: grounded answer
+  API-->>UI: content/citation/done
+  Note over API: timeout or model failure -> deterministic fallback
+```
 
+## 关键设计决策
+
+1. 模型不直接打分，避免同一输入得到漂移结果；Java 服务是唯一评分源。
+2. 外部简历、JD 和知识文档均视为不可信数据；高风险提示注入文本不会进入检索结果。
+3. 所有业务资源按 `userId + resourceId` 校验，工具调用通过线程作用域绑定当前用户。
+4. 本地 H2 快照让项目开箱即用；生产环境切换 PostgreSQL，Redis 负责跨实例限流。
+5. 模型未配置或超时时明确降级，不伪造“AI 已分析”。
+
+## 可继续演进
+
+当前 RAG 是适合小型作品集的词法混合检索。数据规模增长后，可把 `KnowledgeService` 适配为 pgvector 向量召回 + BM25 重排；状态快照可进一步拆成规范化 Repository，而无需改动 Controller 或前端协议。

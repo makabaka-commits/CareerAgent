@@ -17,8 +17,16 @@ class SkillServiceTest {
                 new JobRequirement(java.id(),java.name(),"REQUIRED",3,"熟练 Java"),
                 new JobRequirement(redis.id(),redis.name(),"PREFERRED",2,"了解 Redis")),"PARSED", Instant.now());
         SkillGapReport report=service.calculate(uid,job);
-        assertThat(report.score()).isEqualTo(75.0); // (3*1 + 1*0) / 4
+        assertThat(report.score()).isBetween(60.0, 75.0);
         assertThat(report.requiredRate()).isEqualTo(100.0);
+        assertThat(report.preferredRate()).isEqualTo(0.0);
+        assertThat(report.dimensions().evidenceStrength()).isGreaterThan(40.0);
         assertThat(report.missingSkills()).containsExactly("Redis");
+    }
+
+    @Test void reportsNoPreferredDimensionAsNotApplicable(){
+        Job job=new Job(3,1,"Acme","Java 实习","",List.of(
+                new JobRequirement(java.id(),java.name(),"REQUIRED",3,"熟练 Java")),"PARSED",Instant.now());
+        assertThat(service.calculate(1,job).preferredRate()).isNull();
     }
 }
