@@ -15,7 +15,7 @@ const router=createRouter({history:createWebHistory(),routes:[
   {path:'/app',component:AppLayout,meta:{auth:true},children:[
     {path:'',redirect:'/app/dashboard'},{path:'dashboard',component:DashboardPage,meta:{title:'总览'}},
     {path:'profile',component:ProfilePage,meta:{title:'职业画像'}},{path:'resumes',component:ResumePage,meta:{title:'简历证据'}},
-    {path:'jobs',component:JobsPage,meta:{title:'岗位匹配'}},{path:'agent',component:AgentPage,meta:{title:'Career Agent'}},
+    {path:'jobs',component:JobsPage,meta:{title:'岗位匹配'}},{path:'agent',component:AgentPage,meta:{title:'Stepwise 顾问'}},
     {path:'interviews',component:InterviewPage,meta:{title:'模拟面试'}}]},
   {path:'/:pathMatch(.*)*',component:NotFoundPage}
 ]})

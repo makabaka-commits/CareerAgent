@@ -3,7 +3,7 @@
 1. 首页点击“在线体验”，直接生成一次性示例用户；正式演示也可注册新用户。
 2. 上传 `tests/fixtures/resume-demo.md`；展示识别出的技能及原文证据，再点击确认。
 3. 录入 `tests/fixtures/job-demo.txt`；展示 REQUIRED/PREFERRED 分类、四维分、置信度和逐项证据。强调分数是证据契合度，不是录用概率。
-4. 在 Career Agent 中询问“我适合这个岗位吗？”；观察公开的 tool_call、回答和 chunk 引用。
+4. 在 Stepwise 顾问中询问“我适合这个岗位吗？”；观察公开的 tool_call、回答和 chunk 引用。
 5. 开始模拟面试；第一题完整回答，第二题故意遗漏关键点以触发一次追问，最后展示报告。
 
 简历描述建议（只在你实际跑通后使用）：

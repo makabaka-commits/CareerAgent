@@ -2,10 +2,9 @@
 import {computed,onMounted,ref} from 'vue'
 import {useRoute,useRouter} from 'vue-router'
 import {useCareerStore} from '../stores/career'
-import BrandMark from '../components/BrandMark.vue'
 const route=useRoute(),router=useRouter(),store=useCareerStore(),mobileOpen=ref(false)
-const title=computed(()=>String(route.meta.title||'CareerAgent'))
-const nav=[['/app/dashboard','总览','01'],['/app/profile','职业画像','02'],['/app/resumes','简历证据','03'],['/app/jobs','岗位匹配','04'],['/app/agent','Career Agent','05'],['/app/interviews','模拟面试','06']]
+const title=computed(()=>String(route.meta.title||'Stepwise'))
+const nav=[['/app/dashboard','总览','01'],['/app/profile','职业画像','02'],['/app/resumes','简历证据','03'],['/app/jobs','岗位匹配','04'],['/app/agent','Stepwise 顾问','05'],['/app/interviews','模拟面试','06']]
 function signOut(){store.logout();router.push('/')}
 function chooseJob(event:Event){const value=(event.target as HTMLSelectElement).value;store.selectJob(value?Number(value):undefined)}
 onMounted(()=>store.ensureReady())
@@ -13,7 +12,7 @@ onMounted(()=>store.ensureReady())
 <template>
   <div class="workspace-shell">
     <aside class="app-sidebar" :class="{open:mobileOpen}">
-      <RouterLink class="product-brand" to="/"><BrandMark/><b>CareerAgent</b></RouterLink>
+      <RouterLink class="product-brand" to="/"><b>Stepwise</b><small>让每一步，都有依据。</small></RouterLink>
       <nav><RouterLink v-for="item in nav" :key="item[0]" :to="item[0]" @click="mobileOpen=false"><span>{{item[2]}}</span>{{item[1]}}</RouterLink></nav>
       <div class="sidebar-foot"><span>当前方向</span><strong>{{store.profile.targetPosition||'尚未设置'}}</strong><button @click="signOut">退出账号 ↗</button></div>
     </aside>
