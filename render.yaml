@@ -13,10 +13,18 @@ services:
         value: 10000
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      - key: DATABASE_URL
+      - key: DATABASE_HOST
         fromDatabase:
           name: stepwise-db
-          property: connectionString
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: stepwise-db
+          property: port
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: stepwise-db
+          property: database
       - key: DATABASE_USER
         fromDatabase:
           name: stepwise-db

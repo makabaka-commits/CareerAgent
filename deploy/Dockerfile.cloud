@@ -21,4 +21,4 @@ RUN apt-get update \
     && mkdir -p /app/storage
 COPY --from=backend-build /workspace/target/*.jar app.jar
 EXPOSE 10000
-ENTRYPOINT ["sh","-c","export DATABASE_URL=\"jdbc:${DATABASE_URL#jdbc:}\"; exec java -jar app.jar"]
+ENTRYPOINT ["sh","-c","export DATABASE_URL=\"jdbc:postgresql://${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}\"; exec java -jar app.jar"]
