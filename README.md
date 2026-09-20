@@ -2,6 +2,8 @@
 
 > 让每一步，都有依据。
 
+**在线体验：** [https://stepwise-app.onrender.com](https://stepwise-app.onrender.com)
+
 面向计算机专业学生的可解释 AI 求职智能体。它把简历解析、岗位分析、证据化匹配、Agent 咨询和模拟面试串成一个完整产品闭环；评分由确定性规则完成，模型只负责工具选择与解释。
 
 ## 为什么值得放进作品集
