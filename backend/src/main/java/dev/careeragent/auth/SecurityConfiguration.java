@@ -23,7 +23,8 @@ public class SecurityConfiguration {
     @Bean SecurityFilterChain apiSecurity(HttpSecurity http,AuthFilter authFilter)throws Exception{
         return http.csrf(csrf->csrf.disable()).cors(cors->{}).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a->a.requestMatchers("/api/v1/auth/**","/actuator/health","/v3/api-docs/**","/swagger-ui/**").permitAll()
-                        .requestMatchers(HttpMethod.GET,"/actuator/info").permitAll().anyRequest().authenticated())
+                        .requestMatchers(HttpMethod.GET,"/actuator/info").permitAll()
+                        .requestMatchers("/api/v1/**").authenticated().anyRequest().permitAll())
                 .addFilterBefore(authFilter,UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(e->e.authenticationEntryPoint((req,res,ex)->{res.setStatus(401);res.setContentType("application/json;charset=UTF-8");res.getWriter().write("{\"success\":false,\"data\":null,\"message\":\"请先登录\"}");}))
                 .build();

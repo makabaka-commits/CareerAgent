@@ -7,6 +7,7 @@ class AuthIntegrationTest{
  MockMvc mvc;@Autowired WebApplicationContext context;@Autowired ObjectMapper json;@Autowired InMemoryStore store;@Autowired JdbcClient jdbc;
  @BeforeEach void setup(){mvc=webAppContextSetup(context).apply(springSecurity()).build();}
  @Test void protectsApiAndAllowsRegisteredUser()throws Exception{
+  int landingStatus=mvc.perform(get("/")).andReturn().getResponse().getStatus();Assertions.assertNotEquals(401,landingStatus);
   mvc.perform(get("/api/v1/profiles/me")).andExpect(status().isUnauthorized());
   String response=mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"tester\",\"email\":\"tester@example.com\",\"password\":\"secret12\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
   Map<?,?> root=json.readValue(response,Map.class);String token=(String)((Map<?,?>)root.get("data")).get("token");
