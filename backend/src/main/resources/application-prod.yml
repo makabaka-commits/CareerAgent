@@ -8,4 +8,4 @@ app:
   persistence:
     mode: jdbc
   rate-limit:
-    mode: redis
+    mode: ${RATE_LIMIT_MODE:redis}

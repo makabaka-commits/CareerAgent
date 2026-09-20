@@ -7,8 +7,9 @@ import dev.careeragent.job.JobService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpHeaders;
 
 import java.time.Instant;
 import java.util.Map;
@@ -20,8 +21,9 @@ public class AuthController {
     private final InMemoryStore store;
     private final TokenService tokens;
     private final JobService jobs;
-    private final BCryptPasswordEncoder passwords = new BCryptPasswordEncoder();
-    public AuthController(InMemoryStore store, TokenService tokens, JobService jobs) { this.store = store; this.tokens = tokens; this.jobs = jobs; }
+    private final PasswordEncoder passwords;
+    private final LoginAttemptGuard attempts;
+    public AuthController(InMemoryStore store, TokenService tokens, JobService jobs,PasswordEncoder passwords,LoginAttemptGuard attempts) { this.store = store; this.tokens = tokens; this.jobs = jobs;this.passwords=passwords;this.attempts=attempts; }
 
     public record RegisterRequest(@NotBlank String username, @Email @NotBlank String email, @Size(min=6,max=72) String password) {}
     public record LoginRequest(@NotBlank String account, @NotBlank String password) {}
@@ -38,10 +40,16 @@ public class AuthController {
 
     @PostMapping("/login")
     public ApiResponse<Map<String,Object>> login(@Valid @RequestBody LoginRequest request) {
-        User user = store.users.values().stream().filter(u -> u.username().equalsIgnoreCase(request.account()) || u.email().equalsIgnoreCase(request.account())).findFirst()
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "账号或密码错误"));
-        if (!passwords.matches(request.password(), user.passwordHash())) throw new ApiException(HttpStatus.UNAUTHORIZED, "账号或密码错误");
+        attempts.check(request.account());User user=store.users.values().stream().filter(u->u.username().equalsIgnoreCase(request.account())||u.email().equalsIgnoreCase(request.account())).findFirst().orElse(null);
+        if(user==null||!passwords.matches(request.password(),user.passwordHash())){attempts.failure(request.account());throw new ApiException(HttpStatus.UNAUTHORIZED,"账号或密码错误");}
+        attempts.success(request.account());
         return ApiResponse.ok(Map.of("token", tokens.create(user.id()), "user", Map.of("id", user.id(), "username", user.username(), "email", user.email())));
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<Map<String,Boolean>> logout(@RequestHeader(value=HttpHeaders.AUTHORIZATION,required=false)String authorization){
+        if(authorization!=null&&authorization.startsWith("Bearer "))tokens.revoke(authorization.substring(7));
+        return ApiResponse.ok(Map.of("loggedOut",true));
     }
 
     @PostMapping("/demo")
@@ -55,11 +63,11 @@ public class AuthController {
         levels.forEach((name, level) -> store.skills.values().stream().filter(s -> s.name().equals(name)).findFirst().ifPresent(skill -> {
             long skillId = store.nextId();
             String evidence = switch (name) {
-                case "Java" -> "在 CareerAgent 项目中使用 Java 17 实现 REST API，并通过单元测试验证核心评分逻辑。";
+                case "Java" -> "在 Stepwise 项目中使用 Java 17 实现 REST API，并通过单元测试验证核心评分逻辑。";
                 case "Spring Boot" -> "使用 Spring Boot 构建鉴权、简历、岗位与面试模块，完成统一异常处理和健康检查。";
                 case "MySQL" -> "设计用户、简历、岗位、会话与面试等业务表，但尚缺少线上查询性能数据。";
                 case "Redis" -> "了解 Redis TTL、穿透与一致性方案，当前项目仅完成可切换限流适配。";
-                default -> "在 CareerAgent 项目开发和部署过程中使用 " + name + "，具备可演示的基础实践。";
+                default -> "在 Stepwise 项目开发和部署过程中使用 " + name + "，具备可演示的基础实践。";
             };
             store.userSkills.put(skillId, new UserSkill(skillId, id, skill.id(), level, "DEMO", evidence, null, true));
         }));

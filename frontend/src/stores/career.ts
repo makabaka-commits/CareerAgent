@@ -1,6 +1,7 @@
 import {computed,ref} from 'vue'
 import {defineStore} from 'pinia'
 import {api} from '../api'
+import {parseSseBuffer} from '../sse'
 
 export const useCareerStore=defineStore('career',()=>{
   const token=ref(localStorage.getItem('career-token')||'')
@@ -10,7 +11,7 @@ export const useCareerStore=defineStore('career',()=>{
   const skills=ref<any[]>([]),resumes=ref<any[]>([]),jobs=ref<any[]>([]),conversations=ref<any[]>([])
   const selectedJob=ref<number|undefined>(Number(localStorage.getItem('career-job'))||undefined)
   const match=ref<any>(null),chatMessages=ref<any[]>([]),conversationId=ref<number>()
-  const interview=ref<any>(),question=ref<any>(),report=ref<any>()
+  const interview=ref<any>(),question=ref<any>(),report=ref<any>(),agentStatus=ref<any>()
   const selectedJobData=computed(()=>jobs.value.find(j=>j.id===selectedJob.value))
 
   function saveAuth(data:any){token.value=data.token;user.value=data.user;localStorage.setItem('career-token',data.token);localStorage.setItem('career-user',JSON.stringify(data.user))}
@@ -22,9 +23,10 @@ export const useCareerStore=defineStore('career',()=>{
   function reset(){ready.value=false;skills.value=[];resumes.value=[];jobs.value=[];conversations.value=[];match.value=null;chatMessages.value=[];conversationId.value=undefined;interview.value=undefined;question.value=undefined;report.value=undefined}
   async function refresh(){const data:any=await Promise.all([api.get('/profiles/me'),api.get('/profiles/me/skills'),api.get('/resumes'),api.get('/jobs'),api.get('/conversations')]);[profile.value,skills.value,resumes.value,jobs.value,conversations.value]=data;if(!jobs.value.some(j=>j.id===selectedJob.value))selectedJob.value=jobs.value[0]?.id;if(selectedJob.value)localStorage.setItem('career-job',String(selectedJob.value));ready.value=true}
   async function ensureReady(){if(!ready.value&&token.value)await task(refresh)}
+  async function loadAgentStatus(){agentStatus.value=await api.get('/agent/status')}
   async function saveProfile(){await task(async()=>{profile.value=await api.put('/profiles/me',profile.value)})}
   async function uploadResume(file:File){await task(async()=>{const body=new FormData();body.append('file',file);const value:any=await api.post('/resumes',body);await api.post(`/resumes/${value.id}/parse`);await refresh()})}
-  async function confirmResume(id:number){await task(async()=>{await api.post(`/resumes/${id}/confirm`);await refresh()})}
+  async function confirmResume(id:number,parsed?:any){await task(async()=>{if(parsed)await api.put(`/resumes/${id}/parsed-content`,parsed);await api.post(`/resumes/${id}/confirm`);await refresh()})}
   async function deleteResume(id:number){await task(async()=>{await api.delete(`/resumes/${id}`);await refresh()})}
   async function createJob(form:any){await task(async()=>{const job:any=await api.post('/jobs',form);await refresh();selectJob(job.id);await calculateMatch()})}
   function selectJob(id:number|undefined){selectedJob.value=id;match.value=null;if(id)localStorage.setItem('career-job',String(id));else localStorage.removeItem('career-job')}
@@ -38,10 +40,10 @@ export const useCareerStore=defineStore('career',()=>{
     if(!response.body)throw new Error('当前浏览器不支持流式响应')
     const assistant:any={role:'ASSISTANT',content:'',status:'正在分析',citations:[],trace:[]};chatMessages.value.push(assistant)
     const reader=response.body.getReader(),decoder=new TextDecoder();let buffer=''
-    while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split('\n\n');buffer=events.pop()||'';for(const block of events){const name=block.match(/event:(.+)/)?.[1]?.trim();const raw=block.match(/data:(.+)/)?.[1]?.trim();if(!raw)continue;let data:any;try{data=JSON.parse(raw)}catch{data=raw}if(name==='status')assistant.status=String(data);if(name==='tool_call')assistant.trace.push(data);if(name==='content')assistant.content+=typeof data==='string'?data:String(data);if(name==='citation')assistant.citations.push(data);if(name==='done')assistant.status='完成'}}
+    while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const parsed=parseSseBuffer(buffer);buffer=parsed.rest;for(const {name,data} of parsed.events){if(name==='status')assistant.status=String(data);if(name==='mode')assistant.status=String(data);if(name==='tool_call')assistant.trace.push(data);if(name==='content')assistant.content+=typeof data==='string'?data:String(data);if(name==='citation')assistant.citations.push(data);if(name==='done')assistant.status='完成'}}
   }
   async function startInterview(){if(!selectedJob.value)throw new Error('请先选择岗位');await task(async()=>{interview.value=await api.post('/interviews',{jobId:selectedJob.value});question.value=await api.post(`/interviews/${interview.value.id}/start`);report.value=undefined})}
   async function submitAnswer(answer:string){if(!interview.value||!question.value)return;await task(async()=>{const data:any=await api.post(`/interviews/${interview.value.id}/answers`,{questionId:question.value.id,answer});question.value=data.nextQuestion;if(data.canFinish)await finishInterview()})}
   async function finishInterview(){if(!interview.value)return;report.value=await api.post(`/interviews/${interview.value.id}/finish`);question.value=undefined}
-  return{token,user,loading,ready,error,profile,skills,resumes,jobs,conversations,selectedJob,selectedJobData,match,chatMessages,interview,question,report,login,register,startDemo,logout,refresh,ensureReady,saveProfile,uploadResume,confirmResume,deleteResume,createJob,selectJob,calculateMatch,sendChat,startInterview,submitAnswer,finishInterview}
+  return{token,user,loading,ready,error,profile,skills,resumes,jobs,conversations,selectedJob,selectedJobData,match,chatMessages,interview,question,report,agentStatus,login,register,startDemo,logout,refresh,ensureReady,loadAgentStatus,saveProfile,uploadResume,confirmResume,deleteResume,createJob,selectJob,calculateMatch,sendChat,startInterview,submitAnswer,finishInterview}
 })

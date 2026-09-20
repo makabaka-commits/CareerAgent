@@ -17,7 +17,7 @@ public final class Models {
                          StructuredResume parsed, String status, boolean current, String errorMessage, Instant createdAt) {}
     public record StructuredResume(String name, String education, List<ResumeSkill> skills,
                                    List<String> projects, List<String> experiences) {}
-    public record ResumeSkill(String name, int level, String evidence) {}
+    public record ResumeSkill(String name, int level, double confidence, String evidence) {}
     public record Job(long id, long userId, String companyName, String positionName, String rawContent,
                       List<JobRequirement> requirements, String status, Instant createdAt) {}
     public record JobRequirement(long skillId, String skillName, String importance, Integer requirementLevel,

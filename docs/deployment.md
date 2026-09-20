@@ -25,6 +25,18 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
 
 如果使用 Railway/Render，可将前后端建为两个服务，并连接托管 PostgreSQL/Redis。不要把 `.env` 或 API Key 提交到 GitHub。
 
+## Render 一键部署（推荐用于简历演示）
+
+项目已经提供根目录 `render.yaml` 和 `deploy/Dockerfile.cloud`。云端镜像会把 Vue 构建产物打进 Spring Boot，因此前端、API 和 SSE 共用一个 HTTPS 域名，不需要额外处理跨域。
+
+1. 打开 `https://render.com/deploy?repo=https://github.com/makabaka-commits/CareerAgent`；
+2. 使用 GitHub 登录并允许读取该仓库；
+3. 确认创建 `stepwise-app` 和 `stepwise-db`；
+4. 等待健康检查通过，访问 Render 提供的 `onrender.com` 地址；
+5. 如需真实模型，在服务环境变量中添加 `AI_PROVIDER=openai` 和 `AI_API_KEY`。
+
+免费 Web 服务可能休眠，首次访问需要等待启动；免费实例没有持久磁盘，所以演示上传文件可能在重新部署后消失，结构化业务数据仍保存在 PostgreSQL。正式使用应挂载 `/app/storage` 持久磁盘。
+
 ## 生产检查清单
 
 - 使用至少 32 字节随机 Token Secret；

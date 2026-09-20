@@ -4,13 +4,14 @@ import dev.careeragent.common.ApiException;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-@Component
 public class AuthFilter extends OncePerRequestFilter {
     public static final String USER_ID = "currentUserId";
     private final TokenService tokens;
@@ -24,7 +25,10 @@ public class AuthFilter extends OncePerRequestFilter {
         try {
             String header = request.getHeader("Authorization");
             if (header == null || !header.startsWith("Bearer ")) throw new ApiException(org.springframework.http.HttpStatus.UNAUTHORIZED, "请先登录");
-            request.setAttribute(USER_ID, tokens.verify(header.substring(7)));
+            long userId=tokens.verify(header.substring(7));
+            request.setAttribute(USER_ID,userId);
+            SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                    userId,null,java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))));
             chain.doFilter(request, response);
         } catch (ApiException e) {
             response.setStatus(e.status().value());

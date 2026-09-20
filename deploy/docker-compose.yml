@@ -25,6 +25,8 @@ services:
       AI_API_KEY: ${AI_API_KEY:-disabled}
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com}
       AI_CHAT_MODEL: ${AI_CHAT_MODEL:-gpt-4.1-mini}
+      OCR_ENABLED: "true"
+      OCR_EXECUTABLE: /usr/bin/tesseract
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
     volumes: ["resume_data:/app/storage"]
     depends_on:

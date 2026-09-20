@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: stepwise-app
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./deploy/Dockerfile.cloud
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: SERVER_PORT
+        value: 10000
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stepwise-db
+          property: connectionString
+      - key: DATABASE_USER
+        fromDatabase:
+          name: stepwise-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: stepwise-db
+          property: password
+      - key: APP_TOKEN_SECRET
+        generateValue: true
+      - key: RATE_LIMIT_MODE
+        value: local
+      - key: AI_PROVIDER
+        value: none
+      - key: FILE_STORAGE_ROOT
+        value: /app/storage
+      - key: OCR_ENABLED
+        value: "true"
+      - key: OCR_EXECUTABLE
+        value: /usr/bin/tesseract
+databases:
+  - name: stepwise-db
+    plan: free
+    region: singapore
+    databaseName: stepwise
+    user: stepwise
+    postgresMajorVersion: "16"

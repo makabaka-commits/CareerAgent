@@ -9,7 +9,7 @@
 - **正式产品界面**：Vue 3 + TypeScript 的落地页、体验入口与响应式工作台，不是单页表单 Demo。
 - **可信匹配**：技能覆盖 40%、证据强度 30%、熟练度适配 20%、项目相关性 10%，逐项说明得分和原始 JD。
 - **Agent 工程**：Spring AI 工具调用、SSE 状态流、短期会话上下文、可追溯 RAG 引用、超时自动降级。
-- **生产能力**：H2 零配置本地运行，PostgreSQL 持久化、Redis 分布式限流、文件存储抽象、Actuator/Prometheus 指标。
+- **生产能力**：H2 零配置本地运行，PostgreSQL 关系表 + Flyway 迁移、Redis 分布式限流、Spring Security、Actuator/Prometheus 指标。
 - **可部署**：Docker Compose 一键启动前端、后端、PostgreSQL 与 Redis；GitHub Actions 自动测试、构建与镜像校验。
 
 ## 技术栈
@@ -18,7 +18,7 @@
 
 ## 5 分钟本地运行
 
-需要 Java 17+、Node.js 20+。默认不需要数据库和模型密钥。
+需要 Java 17+、Node.js 20+。默认不需要数据库和模型密钥。项目已约定从 `D:\\DevTools\\Tesseract-OCR` 调用中英文 OCR；若本机未安装，可将 `OCR_ENABLED` 设为 `false`，普通文本简历仍可正常解析。
 
 ```powershell
 # 终端 1：后端
@@ -49,9 +49,18 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up --build
 ## 验证
 
 ```powershell
-& .\.tools\apache-maven-3.9.16\bin\mvn.cmd -B test
+& .\.tools\apache-maven-3.9.16\bin\mvn.cmd "-Dmaven.repo.local=D:\code\CareerAgent\.tools\m2-repository" -B test
+pnpm --dir frontend test
 pnpm --dir frontend build
 ```
+
+## 一键公网部署
+
+仓库根目录包含 `render.yaml` 和前后端一体化云端镜像。登录 Render 后点击下面按钮，即可创建 Web 服务和 PostgreSQL；首次构建完成后会得到一个 HTTPS 公网网址。
+
+[Deploy to Render](https://render.com/deploy?repo=https://github.com/makabaka-commits/CareerAgent)
+
+免费实例适合作品集演示，会休眠且上传文件是临时存储；长期使用时应升级实例并挂载持久磁盘。云端镜像已包含中英文 Tesseract OCR；模型默认关闭，未配置密钥时使用规则保障模式。
 
 ## 文档
 

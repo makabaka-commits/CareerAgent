@@ -21,7 +21,8 @@ public class ResumeService {
     private final InMemoryStore store;
     private final SkillService skills;
     private final ResumeFileStorage files;
-    public ResumeService(InMemoryStore store, SkillService skills, ResumeFileStorage files) { this.store = store; this.skills = skills; this.files = files; }
+    private final ResumeOcrService ocr;
+    public ResumeService(InMemoryStore store, SkillService skills, ResumeFileStorage files,ResumeOcrService ocr) { this.store = store; this.skills = skills; this.files = files;this.ocr=ocr; }
 
     public Resume upload(long userId, MultipartFile file) {
         String name = Optional.ofNullable(file.getOriginalFilename()).orElse("resume");
@@ -29,7 +30,8 @@ public class ResumeService {
         if (!Set.of("pdf", "docx", "txt", "md").contains(ext)) throw new ApiException(HttpStatus.BAD_REQUEST, "仅支持 PDF、DOCX、TXT 或 Markdown 简历");
         try {
             String text = extract(file, ext).replace('\u0000', ' ').trim();
-            if (text.length() < 20) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "未提取到足够文本；扫描版 PDF 暂不支持 OCR");
+            if(text.length()<20&&"pdf".equals(ext))text=ocr.extract(file.getBytes()).replace('\u0000',' ').trim();
+            if (text.length() < 20) throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "未提取到足够文本；如为扫描版 PDF，请启用 OCR 服务");
             String fileKey = files.save(userId, file);
             long id = store.nextId();
             Resume resume = new Resume(id, userId, name, file.getContentType(), fileKey, text, null, "UPLOADED", false, null, Instant.now());
@@ -40,7 +42,10 @@ public class ResumeService {
 
     public Resume parse(long userId, long id) {
         Resume old = owned(userId, id);
-        List<ResumeSkill> found = skills.detect(old.rawText()).stream().map(skill -> new ResumeSkill(skill.name(), 3, evidenceLine(old.rawText(), skill.name(), skill.aliases()))).toList();
+        List<ResumeSkill> found = skills.detect(old.rawText()).stream().map(skill -> {
+            String evidence=evidenceLine(old.rawText(),skill.name(),skill.aliases());
+            return new ResumeSkill(skill.name(),inferLevel(evidence),confidence(evidence),evidence);
+        }).toList();
         List<String> lines = old.rawText().lines().map(String::trim).filter(line -> line.length() >= 12).limit(20).toList();
         String name = old.rawText().lines().map(String::trim).filter(line -> line.matches("[\\p{L}· ]{2,20}")).findFirst().orElse("");
         StructuredResume parsed = new StructuredResume(name, findSection(old.rawText(), "教育", "大学", "学院"), found,
@@ -86,4 +91,6 @@ public class ResumeService {
     }
     private String findSection(String text, String... terms) { return text.lines().map(String::trim).filter(l -> containsAny(l, terms)).findFirst().orElse(""); }
     private boolean containsAny(String value, String... terms) { return Arrays.stream(terms).anyMatch(value::contains); }
+    private int inferLevel(String evidence){String e=evidence.toLowerCase(Locale.ROOT);if(containsAny(e,"精通","expert","主导","架构"))return 5;if(containsAny(e,"熟练","proficient","深入","负责"))return 4;if(containsAny(e,"掌握","开发","实现","built","developed"))return 3;if(containsAny(e,"了解","熟悉","基础","familiar"))return 2;return 1;}
+    private double confidence(String evidence){double score=.45;if(evidence.length()>=24)score+=.15;if(containsAny(evidence,"项目","系统","平台","开发","实现","负责"))score+=.2;if(evidence.matches(".*[0-9%％].*"))score+=.1;return Math.min(.95,score);}
 }

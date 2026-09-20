@@ -39,9 +39,10 @@ sequenceDiagram
 1. 模型不直接打分，避免同一输入得到漂移结果；Java 服务是唯一评分源。
 2. 外部简历、JD 和知识文档均视为不可信数据；高风险提示注入文本不会进入检索结果。
 3. 所有业务资源按 `userId + resourceId` 校验，工具调用通过线程作用域绑定当前用户。
-4. 本地 H2 快照让项目开箱即用；生产环境切换 PostgreSQL，Redis 负责跨实例限流。
-5. 模型未配置或超时时明确降级，不伪造“AI 已分析”。
+4. H2 与 PostgreSQL 共用同一套关系表和 Flyway 迁移；进程内工作集采用事务性写回，Redis 负责跨实例限流。
+5. Spring Security 负责无状态 API 安全上下文，访问令牌支持过期和主动注销，密码使用 BCrypt 保存。
+6. 模型未配置或超时时明确降级，不伪造“AI 已分析”；固定评测集与 Micrometer 指标持续验证路由和延迟。
 
 ## 可继续演进
 
-当前 RAG 是适合小型作品集的词法混合检索。数据规模增长后，可把 `KnowledgeService` 适配为 pgvector 向量召回 + BM25 重排；状态快照可进一步拆成规范化 Repository，而无需改动 Controller 或前端协议。
+当前 RAG 是适合小型作品集的词法混合检索。数据规模增长后，可把 `KnowledgeService` 适配为 pgvector 向量召回 + BM25 重排；持久层也可以从事务性关系表写回进一步演进为逐聚合 Repository，而无需改动 Controller 或前端协议。

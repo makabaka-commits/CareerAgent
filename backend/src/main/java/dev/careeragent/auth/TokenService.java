@@ -10,20 +10,28 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TokenService {
     private final byte[] secret;
-    public TokenService(@Value("${app.token-secret}") String secret) { this.secret = secret.getBytes(StandardCharsets.UTF_8); }
+    private final long accessSeconds;
+    private final Set<String> revoked=ConcurrentHashMap.newKeySet();
+    public TokenService(@Value("${app.token-secret}") String secret,@Value("${app.token.access-seconds:1800}") long accessSeconds) {
+        if(secret.length()<32) throw new IllegalArgumentException("APP_TOKEN_SECRET 至少需要 32 个字符");
+        this.secret=secret.getBytes(StandardCharsets.UTF_8);this.accessSeconds=accessSeconds;
+    }
 
     public String create(long userId) {
-        String payload = userId + ":" + Instant.now().plusSeconds(86400).getEpochSecond();
+        String payload = userId + ":" + Instant.now().plusSeconds(accessSeconds).getEpochSecond()+":"+UUID.randomUUID();
         return encode(payload) + "." + encode(sign(payload));
     }
 
     public long verify(String token) {
         try {
-            String[] parts = token.split("\\.");
+            if(revoked.contains(token))throw new IllegalArgumentException();String[] parts = token.split("\\.");
             String payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
             if (!constantTimeEquals(sign(payload), Base64.getUrlDecoder().decode(parts[1]))) throw new IllegalArgumentException();
             String[] values = payload.split(":");
@@ -31,6 +39,7 @@ public class TokenService {
             return Long.parseLong(values[0]);
         } catch (Exception e) { throw new ApiException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录"); }
     }
+    public void revoke(String token){if(token!=null&&!token.isBlank())revoked.add(token);}
 
     private byte[] sign(String value) {
         try {
