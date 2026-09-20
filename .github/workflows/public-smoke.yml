@@ -1,0 +1,57 @@
+name: Public smoke test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-smoke-test
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_URL: https://stepwise-app.onrender.com
+    steps:
+      - name: Wait for the public service
+        shell: bash
+        run: |
+          set -uo pipefail
+          health_url="${APP_URL%/}/actuator/health"
+
+          for attempt in $(seq 1 15); do
+            http_code=$(curl --location --silent --show-error \
+              --connect-timeout 5 --max-time 20 \
+              --output health.json --write-out "%{http_code}" \
+              "$health_url" || true)
+
+            if [[ "$http_code" == "200" ]] && grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' health.json; then
+              echo "Public service is healthy."
+              exit 0
+            fi
+
+            echo "Attempt ${attempt}/15 returned HTTP ${http_code:-000}; waiting for cold start."
+            if [[ "$attempt" -lt 15 ]]; then
+              sleep 20
+            fi
+          done
+
+          echo "Health check did not become ready. Last response:"
+          cat health.json 2>/dev/null || true
+          exit 1
+
+      - name: Verify the public homepage
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --location --fail --silent --show-error \
+            --connect-timeout 10 --max-time 60 \
+            --output homepage.html "${APP_URL%/}/"
+          grep -Fq '<title>Stepwise' homepage.html
+          echo "Homepage returned the Stepwise application shell."
